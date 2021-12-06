@@ -1,30 +1,83 @@
 import cv2
 import pygenshin.modules.inputs as pgInputs
 import pygenshin.modules.detection.opencvUtils as opencvUtils
-from   pygenshin.modules.additional_types import Rect, Vector2
-import pygenshin.modules.low_level.gamescreens as pgScreens
+from pygenshin.modules.additional_types import Rect, Vector2
+import pygenshin.modules.gamescreens as pgScreens
+
 
 class MapLocation:
-    X_SCALE = 0.44392523364
-    Y_SCALE = 21.7047817048
+    Inputs: pgInputs.Inputs = None
+
     DomainMarker = None
     TeleportMarker = None
+    FullMap = None
 
-    def __init__(self, datafolder) -> None:
-        self.DomainMarker = cv2.imread(datafolder + "images/map/location/domainMarker.png")
-        self.TeleportMarker = cv2.imread(datafolder + "images/map/location/teleportMarker.png")
+    WindowRect: Rect = None
+    ResizedMap = None
 
-    def ZoomOut(self, resolution:Vector2, inputs:pgInputs.Inputs):
-        inputs.SetMousePos(pgScreens.MapScreen.Buttons.ZoomPlus.position.center.toPixels(resolution.asTuple()))
+    CurrentPosition: Vector2 = None
+
+    def __init__(self, datafolder, windowrect: Rect, inputs: pgInputs.Inputs) -> None:
+        self.DomainMarker = cv2.imread(
+            datafolder + "images/map/location/domainMarker.png", cv2.IMREAD_GRAYSCALE)
+        self.TeleportMarker = cv2.imread(
+            datafolder + "images/map/location/teleportMarker.png", cv2.IMREAD_GRAYSCALE)
+        self.FullMap = cv2.imread(
+            datafolder + "images/map/full_cropped.jpg", cv2.IMREAD_GRAYSCALE)
+
+        self.WindowRect = windowrect
+        self.Inputs = inputs
+
+    def ZoomIn(self):
+        self.Inputs.SetMousePos(pgScreens.MapScreen.Buttons.ZoomPlus.position.center.toPixels(
+            self.WindowRect.GetDimensions().asTuple()))
         for i in range(5):
-            inputs.ClickMouse()
+            self.Inputs.ClickMouse()
 
-    def GetMyLocation(self, inputs, screenshot, windowrect):
-        self.ZoomOut(windowrect.GetDimensions(), inputs)
-        domain, teleport = opencvUtils.bestMatches(screenshot, [self.DomainMarker, self.TeleportMarker])
+    def GetMyLocationOnFullMap(self, screenshot):
+        self.ZoomIn()
+        rect = opencvUtils.featureMatching(
+            self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY))
+        print(rect)
+        rect = Rect.fromTuples(rect[0], rect[1])
 
-        if (domain): inputs.SetMousePos(Vector2.fromTuple(domain))
-        if (teleport): inputs.SetMousePos(Vector2.fromTuple(teleport))
+        self.ResizedMap = opencvUtils.cropImage(self.FullMap, rect)
+        self.CurrentPosition = rect.center
+        return self.CurrentPosition
 
-    def ConvertScreenLocationToMap(self, location:Vector2):
+        # domain, teleport = opencvUtils.bestMatches(
+        #     screenshot, [self.DomainMarker, self.TeleportMarker])
+
+        # if (domain):
+        #     inputs.SetMousePos(Vector2.fromTuple(domain))
+        # if (teleport):
+        #     inputs.SetMousePos(Vector2.fromTuple(teleport))
+
+    def GetMyLocationOnMinimap(self, minimap):
+        if (not self.ResizedMap):
+            return
+
+        rect = opencvUtils.featureMatching(self.ResizedMap, minimap)
+        rect = Rect.fromTuples(rect)
+        self.CurrentPosition = rect.center
+        #                                                       pgScreens.GameScreen.rect):
+        if (self.DistanceToBounds(self.CurrentPosition, rect) < 100):
+            dims = self.WindowRect.GetDimensions()
+            resize_rect = Rect(
+                Vector2(self.CurrentPosition.x - dims.x / 2,
+                        self.CurrentPosition.y - dims.y / 2),
+                Vector2(self.CurrentPosition.x + dims.x / 2,
+                        self.CurrentPosition.y + dims.y / 2))
+            self.ResizedMap = opencvUtils.cropImage(self.FullMap, resize_rect)
+
+        return self.CurrentPosition
+
+    def ConvertScreenLocationToMap(self, location: Vector2):
         return location / Vector2(self.X_SCALE, self.Y_SCALE)
+
+    def DistanceToBounds(self, point: Vector2, bounds: Rect):
+        distTop = abs(point.y - bounds.start.y)
+        distBottom = abs(point.y - bounds.end.y)
+        distLeft = abs(point.x - bounds.start.x)
+        distRight = abs(point.y - bounds.end.x)
+        return min([distTop, distBottom, distLeft, distRight])
