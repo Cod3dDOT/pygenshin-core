@@ -1,0 +1,1 @@
+from .pygenshin import PYGenshin
