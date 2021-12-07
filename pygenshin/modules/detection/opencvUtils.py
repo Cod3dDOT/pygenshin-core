@@ -11,14 +11,19 @@ def isInsideBounds(coordinates, bounds) -> bool:
     return not (coordinates[0] < bounds[0][0] or coordinates[0] > bounds[1][0] or coordinates[1] < bounds[0][1] or coordinates[1] > bounds[1][1])
 
 
-def featureMatching(data, template, threshold=0.7):
+def featureMatching(data, template, threshold=0.7, data_info=()):
     MIN_MATCH_COUNT = 10
     # Initiate SIFT detector
     sift = cv2.SIFT_create()
 
     # find the keypoints and descriptors with SIFT
     kp1, des1 = sift.detectAndCompute(template, None)
-    kp2, des2 = sift.detectAndCompute(data, None)
+    kp2 = None
+    des2 = None
+    if (len(data_info) > 0):
+        kp2, des2 = data_info
+    else:
+        kp2, des2 = sift.detectAndCompute(data, None)
 
     FLANN_INDEX_KDTREE = 0
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)

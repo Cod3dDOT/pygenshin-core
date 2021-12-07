@@ -1,9 +1,12 @@
-import cv2
 import pygenshin.modules.inputs as pgInputs
 import pygenshin.modules.detection.opencvUtils as opencvUtils
-from pygenshin.modules.additional_types import Rect, Vector2
+from pygenshin.modules.additional_types import PYGenshinException, Rect, Vector2
 import pygenshin.modules.gamescreens as pgScreens
+
+import cv2
 import time
+import os
+import numpy
 
 
 class MapLocation:
@@ -13,6 +16,9 @@ class MapLocation:
     TeleportMarker = None
     FullMap = None
 
+    FullMapLoadedDescriptors = False
+    FullMapInfo = None
+
     WindowRect: Rect = None
 
     ResizedMapIsSet = False
@@ -21,7 +27,7 @@ class MapLocation:
 
     CurrentPosition: Vector2 = None
 
-    def __init__(self, datafolder, windowrect: Rect, inputs: pgInputs.Inputs) -> None:
+    def __init__(self, datafolder, windowrect: Rect, inputs: pgInputs.Inputs, loadMapDescriptors=True) -> None:
         self.DomainMarker = cv2.imread(
             datafolder + "images/map/location/domainMarker.png", cv2.IMREAD_GRAYSCALE)
         self.TeleportMarker = cv2.imread(
@@ -32,6 +38,12 @@ class MapLocation:
         self.WindowRect = windowrect
         self.Inputs = inputs
 
+        if (loadMapDescriptors):
+            self.LoadMapDescriptors(
+                datafolder + "computed/map_computed_kpts.npy",
+                datafolder + "computed/map_computed_desc.npy"
+            )
+
     def ZoomIn(self):
         self.Inputs.SetMousePos(pgScreens.MapScreen.Buttons.ZoomPlus.position.center.toPixels(
             self.WindowRect.GetDimensions().asTuple()))
@@ -39,10 +51,30 @@ class MapLocation:
             self.Inputs.ClickMouse()
             time.sleep(0.1)
 
+    def LoadMapDescriptors(self, kpts_path, desc_path):
+        if os.path.getsize(kpts_path) <= 0 or os.path.getsize(desc_path) <= 0:
+            raise PYGenshinException("Failed loading descriptors")
+        kpts = numpy.load(kpts_path)
+        desc = numpy.load(desc_path)
+        if kpts.size == 0 or desc.size == 0:
+            raise PYGenshinException("Failed loading descriptors")
+        try:
+            keypoints = [cv2.KeyPoint(x, y, _size, _angle, _response, int(_octave), int(_class_id))
+                         for x, y, _size, _angle, _response, _octave, _class_id in list(kpts)]
+            self.FullMapInfo = (keypoints, numpy.array(desc))
+            self.FullMapLoadedDescriptors = True
+        except(IndexError):
+            raise PYGenshinException("Failed loading descriptors")
+
     def GetMyLocationOnFullMap(self, screenshot) -> Vector2:
         self.ZoomIn()
-        rect = opencvUtils.featureMatching(
-            self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY))
+        rect = None
+        if (self.FullMapLoadedDescriptors):
+            rect = opencvUtils.featureMatching(
+                self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY), 0.7, self.FullMapInfo)
+        else:
+            rect = opencvUtils.featureMatching(
+                self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY))
         rect = Rect.fromTuples(rect[0], rect[1])
 
         self.ResizedMapIsSet = True
@@ -73,12 +105,16 @@ class MapLocation:
             )
         )
 
+        minimap_h = minimap.shape[0]
+
         rect = opencvUtils.featureMatching(
             self.ResizedMap, cv2.cvtColor(minimap, cv2.COLOR_RGB2GRAY))
         rect = round(Rect.fromTuples(rect[0], rect[1]))
         self.CurrentPosition = self.ResizedMapPosition.start + rect.center
-        #                                                       pgScreens.GameScreen.rect):
-        if (self.DistanceToBounds(self.CurrentPosition, rect) < 100):
+
+        distanceToBounds = self.DistanceToBounds(self.CurrentPosition, rect)
+        # its a square so we can check only height
+        if (distanceToBounds < minimap_h*2):
             dims = self.WindowRect.GetDimensions()
             resize_rect = Rect(
                 Vector2(self.CurrentPosition.x - dims.x / 2,
@@ -86,6 +122,7 @@ class MapLocation:
                 Vector2(self.CurrentPosition.x + dims.x / 2,
                         self.CurrentPosition.y + dims.y / 2))
             self.ResizedMap = opencvUtils.cropImage(self.FullMap, resize_rect)
+            print("Cropping")
 
         return self.CurrentPosition
 
