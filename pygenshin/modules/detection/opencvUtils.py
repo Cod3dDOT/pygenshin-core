@@ -8,7 +8,7 @@ from pygenshin.modules.additional_types import PYGenshinException, Rect, Vector2
 
 
 def isInsideBounds(coordinates, bounds) -> bool:
-    return not (coordinates[0] < bounds[0][0] or coordinates[0] > bounds[1][0] or coordinates[1] > bounds[0][1] or coordinates[1] < bounds[1][1])
+    return not (coordinates[0] < bounds[0][0] or coordinates[0] > bounds[1][0] or coordinates[1] < bounds[0][1] or coordinates[1] > bounds[1][1])
 
 
 def featureMatching(data, template, threshold=0.7):
@@ -44,16 +44,18 @@ def featureMatching(data, template, threshold=0.7):
 
         h, w = template.shape
         pts = numpy.float32([[0, 0], [0, h-1], [w-1, h-1],
-                            [w-1, 0]]).reshape(-1, 1, 2)
+                             [w-1, 0]]).reshape(-1, 1, 2)
         dst = cv2.perspectiveTransform(pts, M)
     else:
         print("Not enough matches are found - %d/%d" %
               (len(good), MIN_MATCH_COUNT))
 
     np_o = numpy.int32(dst)
-    bounds = [[np_o[1][0][0], np_o[1][0][1]], [np_o[3][0][0], np_o[3][0][1]]]
+    bounds = [[np_o[0][0][0], np_o[0][0][1]], [np_o[2][0][0], np_o[2][0][1]]]
 
     # cv2.rectangle(data, bounds[0], bounds[1], (255, 0, 0), 10)
+    # cv2.circle(
+    #     data, (int((bounds[0][0] + bounds[1][0])/2), int((bounds[0][1] + bounds[1][1])/2)), 20, (255, 0, 0), 10)
     # scale_percent = 10
     # width = int(data.shape[1] * scale_percent / 100)
     # height = int(data.shape[0] * scale_percent / 100)
@@ -162,4 +164,5 @@ def cropImage(original, bounds: Rect):
         raise PYGenshinException(
             "bounds must be of type Rect")
 
-    return original[bounds.start.y + bounds.GetDimensions().y, bounds.start.x + bounds.GetDimensions().x]
+    dims = bounds.GetDimensions()
+    return original[bounds.start.y:(bounds.start.y + dims.y), bounds.start.x:(bounds.start.x + dims.x)]

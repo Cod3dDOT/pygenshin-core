@@ -1,3 +1,4 @@
+import pygenshin
 from pygenshin.modules import detection as pgDetectionModule
 from pygenshin.modules import inputs as pgInputsModule
 from pygenshin.modules import map as pgMapModule
@@ -10,7 +11,6 @@ import time
 import cv2
 
 from pygenshin.modules.additional_types import PYGenshinException
-from pygenshin.modules.detection import opencvUtils
 
 import logging
 
@@ -60,7 +60,7 @@ class PYGenshin:
 
         Instance.DETECTION = pgDetectionModule.Detection(mode)
         Instance.DETECTION.SetResolution(Instance.SETTINGS.WindowRect)
-        print(Instance.GAMEWINDOW.GetWindowRect().GetDimensions())
+        # print(Instance.GAMEWINDOW.GetWindowRect().GetDimensions())
 
         Instance.MAPLOCATION = pgMapModule.MapLocation(
             Instance.SETTINGS.DataFolder, Instance.GAMEWINDOW.GetWindowRect(), Instance.INPUTS)
@@ -69,13 +69,15 @@ class PYGenshin:
 
     def StartRecording():
         if (not Instance.INITIALIZED_RECORDING):
-            return
+            raise PYGenshinException(
+                "Please call InitializeRecording() BEFORE any StartRecording() calls")
         Instance.DETECTION.StartRecording()
         time.sleep(1)
 
     def StopRecording():
         if (not Instance.INITIALIZED_RECORDING):
-            return
+            raise PYGenshinException(
+                "Please call InitializeRecording() BEFORE any StopRecording() calls")
         Instance.DETECTION.StopRecording()
 
     def SaveScreenshot():
@@ -87,15 +89,19 @@ class PYGenshin:
         def GetMyLocation():
             if (not Instance.INITIALIZED_RECORDING):
                 return
-            Instance.INPUTS.PressUIButton(
-                pgGamescreens.GameScreen.Buttons.MiniMap)
-            time.sleep(1)
-            frame = Instance.DETECTION.GetLastFrame()
-            if (Instance.MAPLOCATION.ResizedMap):
-                # frame = opencvUtils.cropImage(frame, pgGamescreens.MapScreen.)
-                return Instance.MAPLOCATION.GetMyLocationOnMinimap()
+            if (Instance.MAPLOCATION.CanScreenMinimap()):
+                frame = Instance.DETECTION.GetLastFrame()
+                return Instance.MAPLOCATION.GetMyLocationOnMinimap(frame)
             else:
-                return Instance.MAPLOCATION.GetMyLocationOnFullMap(frame)
+                Instance.INPUTS.PressUIButton(
+                    pgGamescreens.GameScreen.Buttons.MiniMap)
+                time.sleep(1)
+                frame = Instance.DETECTION.GetLastFrame()
+                PYGenshin.StopRecording()
+                location = Instance.MAPLOCATION.GetMyLocationOnFullMap(frame)
+                Instance.INPUTS.TapEscKey()
+                PYGenshin.StartRecording()
+                return location
 
     class Logger:
         def logException(exception: PYGenshinException):

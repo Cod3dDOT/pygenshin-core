@@ -80,7 +80,7 @@ class Rect:
         return cls(Vector2(rect[0], rect[1]), Vector2(rect[2], rect[3]))
 
     def GetDimensions(self) -> Vector2:
-        return Vector2(self.tuple[2] - self.tuple[0], self.tuple[3] - self.tuple[1])
+        return Vector2(abs(self.tuple[2] - self.tuple[0]), abs(self.tuple[3] - self.tuple[1]))
 
     def toPixels(self, resolution: Vector2):
         if isinstance(resolution, Vector2):
@@ -93,6 +93,9 @@ class Rect:
 
     def __str__(self):
         return f"Start: {self.start} | End: {self.end}"
+
+    def __round__(self):
+        return Rect(round(self.start), round(self.end))
 
     def asMss(self):
         return self.mss

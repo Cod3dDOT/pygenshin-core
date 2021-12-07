@@ -3,6 +3,7 @@ import pygenshin.modules.inputs as pgInputs
 import pygenshin.modules.detection.opencvUtils as opencvUtils
 from pygenshin.modules.additional_types import Rect, Vector2
 import pygenshin.modules.gamescreens as pgScreens
+import time
 
 
 class MapLocation:
@@ -13,7 +14,10 @@ class MapLocation:
     FullMap = None
 
     WindowRect: Rect = None
+
+    ResizedMapIsSet = False
     ResizedMap = None
+    ResizedMapPosition: Rect = None
 
     CurrentPosition: Vector2 = None
 
@@ -31,18 +35,20 @@ class MapLocation:
     def ZoomIn(self):
         self.Inputs.SetMousePos(pgScreens.MapScreen.Buttons.ZoomPlus.position.center.toPixels(
             self.WindowRect.GetDimensions().asTuple()))
-        for i in range(5):
+        for _ in range(5):
             self.Inputs.ClickMouse()
+            time.sleep(0.1)
 
-    def GetMyLocationOnFullMap(self, screenshot):
+    def GetMyLocationOnFullMap(self, screenshot) -> Vector2:
         self.ZoomIn()
         rect = opencvUtils.featureMatching(
             self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY))
-        print(rect)
         rect = Rect.fromTuples(rect[0], rect[1])
 
+        self.ResizedMapIsSet = True
+        self.ResizedMapPosition = round(rect)
         self.ResizedMap = opencvUtils.cropImage(self.FullMap, rect)
-        self.CurrentPosition = rect.center
+        self.CurrentPosition = round(rect.center)
         return self.CurrentPosition
 
         # domain, teleport = opencvUtils.bestMatches(
@@ -53,13 +59,24 @@ class MapLocation:
         # if (teleport):
         #     inputs.SetMousePos(Vector2.fromTuple(teleport))
 
+    def CanScreenMinimap(self):
+        return self.ResizedMapIsSet
+
     def GetMyLocationOnMinimap(self, minimap):
-        if (not self.ResizedMap):
+        if (not self.CanScreenMinimap()):
             return
 
-        rect = opencvUtils.featureMatching(self.ResizedMap, minimap)
-        rect = Rect.fromTuples(rect)
-        self.CurrentPosition = rect.center
+        minimap = opencvUtils.cropImage(
+            minimap,
+            pgScreens.GameScreen.Buttons.MiniMap.position.toPixels(
+                self.WindowRect.GetDimensions()
+            )
+        )
+
+        rect = opencvUtils.featureMatching(
+            self.ResizedMap, cv2.cvtColor(minimap, cv2.COLOR_RGB2GRAY))
+        rect = round(Rect.fromTuples(rect[0], rect[1]))
+        self.CurrentPosition = self.ResizedMapPosition.start + rect.center
         #                                                       pgScreens.GameScreen.rect):
         if (self.DistanceToBounds(self.CurrentPosition, rect) < 100):
             dims = self.WindowRect.GetDimensions()

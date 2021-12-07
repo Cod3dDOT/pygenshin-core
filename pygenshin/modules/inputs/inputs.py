@@ -32,10 +32,10 @@ class Inputs:
 
     def TapKey(self, key: KEY):
         self.Keyboard.tap(key)
+        time.sleep(0.1)
 
     def ClickMouse(self):
         self.Mouse.click(MOUSEBUTTONS.LEFT)
-        time.sleep(0.1)
 
     def PressUIButton(self, uiButton: UIButton):
         if (uiButton.keybind):
@@ -46,3 +46,6 @@ class Inputs:
             self.ClickMouse()
             self.ReleaseKey('alt')
         time.sleep(1)
+
+    def TapEscKey(self):
+        self.TapKey(KEY.ESCAPE)
