@@ -1,12 +1,11 @@
-from pygenshin.pygenshin import PYGenshin, CreatePyGenshin
+from pygenshin.pygenshin import PYGenshin
 
 import time
 
 
 def main():
     try:
-        CreatePyGenshin()
-
+        PYGenshin.Create()
         PYGenshin.InitializeRecording()
 
         PYGenshin.StartRecording()

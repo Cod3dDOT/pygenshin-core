@@ -25,7 +25,7 @@ def featureMatching(data, template, threshold=0.7, data_info=()):
     else:
         kp2, des2 = sift.detectAndCompute(data, None)
 
-    FLANN_INDEX_KDTREE = 0
+    FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
 

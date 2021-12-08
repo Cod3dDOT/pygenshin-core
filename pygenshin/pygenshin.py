@@ -29,6 +29,10 @@ class PYGenshin:
 
     INITIALIZED_RECORDING = False
 
+    def Create():
+        global Instance
+        Instance = PYGenshin()
+
     def __init__(self) -> None:
         self.SETTINGS = pgSettingsModule.Settings()
 
@@ -68,6 +72,10 @@ class PYGenshin:
         Instance.INITIALIZED_RECORDING = True
 
     def StartRecording():
+        '''Starts background recording of game window.
+        Is required by almost any function.\n
+        Make sure you have called InitializeRecording() before.'''
+
         if (not Instance.INITIALIZED_RECORDING):
             raise PYGenshinException(
                 "Please call InitializeRecording() BEFORE any StartRecording() calls")
@@ -75,9 +83,13 @@ class PYGenshin:
         time.sleep(1)
 
     def StopRecording():
+        '''Stops background recording of game window.\n
+        Make sure you have called InitializeRecording() before.'''
+
         if (not Instance.INITIALIZED_RECORDING):
             raise PYGenshinException(
-                "Please call InitializeRecording() BEFORE any StopRecording() calls")
+                "Please call InitializeRecording() BEFORE any StopRecording() calls"
+            )
         Instance.DETECTION.StopRecording()
 
     def SaveScreenshot():
@@ -86,28 +98,54 @@ class PYGenshin:
         cv2.imwrite("test.png", Instance.DETECTION.GetLastFrame())
 
     class Location:
-        def GetMyLocation():
+        def GetMyLocationWithFullMap():
+            '''Slow but accurate (approx time: 30sec).'''
+
             if (not Instance.INITIALIZED_RECORDING):
-                return
+                raise PYGenshinException(
+                    "Please call InitializeRecording() BEFORE any GetMyLocation() calls"
+                )
+            Instance.INPUTS.PressUIButton(
+                pgGamescreens.GameScreen.Buttons.MiniMap
+            )
+            time.sleep(1)
+            frame = Instance.DETECTION.GetLastFrame()
+            PYGenshin.StopRecording()
+            location = Instance.MAPLOCATION.GetMyLocationOnFullMap(frame)
+            Instance.INPUTS.TapEscKey()
+            PYGenshin.StartRecording()
+            return location
+
+        def GetMyLocationWithMinimap():
+            '''Fast, also is pretty accurate (approx time: 0.15sec).'''
+
+            if (not Instance.INITIALIZED_RECORDING):
+                raise PYGenshinException(
+                    "Please call InitializeRecording() BEFORE any GetMyLocation() calls"
+                )
+            if (not Instance.MAPLOCATION.CanScreenMinimap()):
+                raise PYGenshinException(
+                    "Can't get location with minmap: make sure that you have called \
+                    GetMyLocationWithFullMap() before and CanUseMinimapForLocation() returns True"
+                )
+            frame = Instance.DETECTION.GetLastFrame()
+            return Instance.MAPLOCATION.GetMyLocationOnMinimap(frame)
+
+        def CanUseMinimapForLocation():
+            '''Check if you can use GetMyLocationWithMinimap().\n
+            Returns True if you have used GetMyLocationWithFullMap() atleast once.'''
+
+            return Instance.MAPLOCATION.CanScreenMinimap()
+
+        def GetMyLocation():
+            '''General function to get player location.
+            Will automatically decide whether to use GetMyLocationWithFullMap() or GetMyLocationWithMinimap()'''
+
             if (Instance.MAPLOCATION.CanScreenMinimap()):
-                frame = Instance.DETECTION.GetLastFrame()
-                return Instance.MAPLOCATION.GetMyLocationOnMinimap(frame)
+                return PYGenshin.Location.GetMyLocationWithMinimap()
             else:
-                Instance.INPUTS.PressUIButton(
-                    pgGamescreens.GameScreen.Buttons.MiniMap)
-                time.sleep(1)
-                frame = Instance.DETECTION.GetLastFrame()
-                PYGenshin.StopRecording()
-                location = Instance.MAPLOCATION.GetMyLocationOnFullMap(frame)
-                Instance.INPUTS.TapEscKey()
-                PYGenshin.StartRecording()
-                return location
+                return PYGenshin.Location.GetMyLocationWithFullMap()
 
     class Logger:
         def logException(exception: PYGenshinException):
             Instance.LOGGER.exception(exception)
-
-
-def CreatePyGenshin():
-    global Instance
-    Instance = PYGenshin()
