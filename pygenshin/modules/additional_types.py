@@ -1,12 +1,10 @@
 class Vector2:
     x: float = 0
     y: float = 0
-    tuple = ()
 
     def __init__(self, x: float = 0, y: float = 0) -> None:
         self.x = x
         self.y = y
-        self.tuple = (x, y)
 
     @classmethod
     def fromTuple(cls, coords):
@@ -51,7 +49,10 @@ class Vector2:
         return f"Vector2({self.x}, {self.y})"
 
     def asTuple(self):
-        return self.tuple
+        return (self.x, self.y)
+
+    def asArray(self):
+        return [self.x, self.y]
 
 
 class Rect:

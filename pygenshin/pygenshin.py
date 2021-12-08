@@ -10,7 +10,7 @@ import os
 import time
 import cv2
 
-from pygenshin.modules.additional_types import PYGenshinException
+from pygenshin.modules.additional_types import PYGenshinException, Vector2
 
 import logging
 
@@ -99,7 +99,7 @@ class PYGenshin:
 
     class Location:
         def GetMyLocationWithFullMap():
-            '''Slow but accurate (approx time: 30sec).'''
+            '''Slower, more accurate. Opens full map. (Total time: 5 seconds.)'''
 
             if (not Instance.INITIALIZED_RECORDING):
                 raise PYGenshinException(
@@ -117,7 +117,7 @@ class PYGenshin:
             return location
 
         def GetMyLocationWithMinimap():
-            '''Fast, also is pretty accurate (approx time: 0.15sec).'''
+            '''Fast, less accurate. (Total time: 0.15 seconds). Can only be used if you called GetMyLocationWithFullMap() before.'''
 
             if (not Instance.INITIALIZED_RECORDING):
                 raise PYGenshinException(
@@ -145,6 +145,35 @@ class PYGenshin:
                 return PYGenshin.Location.GetMyLocationWithMinimap()
             else:
                 return PYGenshin.Location.GetMyLocationWithFullMap()
+
+    class Map:
+        def GetClosestItemOfType(position: Vector2, type: str):
+            '''Gets closest item on map of type.\nType must be string separated by ':' \n Example: 'Waypoints:Teleport Waypoints\''''
+            if (not isinstance(position, Vector2)):
+                raise PYGenshinException(
+                    "position needs to be of type Vctor2"
+                )
+            if (not isinstance(type, str) or not ":" in type or not len(type.split(":")) == 2):
+                raise PYGenshinException(
+                    "type needs to be 'category:type'\n \
+                    Example: 'Waypoints:Teleport Waypoints'"
+                )
+            category, type = type.split(":")
+            return Instance.MAPITEMS.GetClosestItemOfType(position, category, type)
+
+        def GetClosestItemPositionOfType(position: Vector2, type: str):
+            '''Gets closest item on map of type.\nType must be string separated by ':' \n Example: 'Waypoints:Teleport Waypoints\''''
+            if (not isinstance(position, Vector2)):
+                raise PYGenshinException(
+                    "position needs to be of type Vctor2"
+                )
+            if (not isinstance(type, str) or not ":" in type or not len(type.split(":")) == 2):
+                raise PYGenshinException(
+                    "type needs to be 'category:type'\n \
+                    Example: 'Waypoints:Teleport Waypoints'"
+                )
+            category, type = type.split(":")
+            return Instance.MAPITEMS.GetClosestItemPositionOfType(position, category, type)
 
     class Logger:
         def logException(exception: PYGenshinException):

@@ -2,8 +2,6 @@ import numpy
 import cv2
 import math
 
-from numpy.core.records import array
-
 from pygenshin.modules.additional_types import PYGenshinException, Rect, Vector2
 
 
@@ -11,10 +9,12 @@ def isInsideBounds(coordinates, bounds) -> bool:
     return not (coordinates[0] < bounds[0][0] or coordinates[0] > bounds[1][0] or coordinates[1] < bounds[0][1] or coordinates[1] > bounds[1][1])
 
 
+sift = cv2.SIFT_create()
+
+
 def featureMatching(data, template, threshold=0.7, data_info=()):
     MIN_MATCH_COUNT = 10
     # Initiate SIFT detector
-    sift = cv2.SIFT_create()
 
     # find the keypoints and descriptors with SIFT
     kp1, des1 = sift.detectAndCompute(template, None)
@@ -39,35 +39,25 @@ def featureMatching(data, template, threshold=0.7, data_info=()):
         if m.distance < threshold * n.distance:
             good.append(m)
 
-    if len(good) > MIN_MATCH_COUNT:
-        src_pts = numpy.float32(
-            [kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
-        dst_pts = numpy.float32(
-            [kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+    if not (len(good) > MIN_MATCH_COUNT):
+        print("Not enough matches are found - {}/{}".format(
+              (len(good), MIN_MATCH_COUNT)))
+        return [[], []]
 
-        M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    src_pts = numpy.float32(
+        [kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+    dst_pts = numpy.float32(
+        [kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
 
-        h, w = template.shape
-        pts = numpy.float32([[0, 0], [0, h-1], [w-1, h-1],
-                             [w-1, 0]]).reshape(-1, 1, 2)
-        dst = cv2.perspectiveTransform(pts, M)
-    else:
-        print("Not enough matches are found - %d/%d" %
-              (len(good), MIN_MATCH_COUNT))
+    M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+
+    h, w = template.shape
+    pts = numpy.float32([[0, 0], [0, h-1], [w-1, h-1],
+                         [w-1, 0]]).reshape(-1, 1, 2)
+    dst = cv2.perspectiveTransform(pts, M)
 
     np_o = numpy.int32(dst)
     bounds = [[np_o[0][0][0], np_o[0][0][1]], [np_o[2][0][0], np_o[2][0][1]]]
-
-    # cv2.rectangle(data, bounds[0], bounds[1], (255, 0, 0), 10)
-    # cv2.circle(
-    #     data, (int((bounds[0][0] + bounds[1][0])/2), int((bounds[0][1] + bounds[1][1])/2)), 20, (255, 0, 0), 10)
-    # scale_percent = 10
-    # width = int(data.shape[1] * scale_percent / 100)
-    # height = int(data.shape[0] * scale_percent / 100)
-    # dim = (width, height)
-    # img2 = cv2.resize(data, dim, interpolation=cv2.INTER_AREA)
-    # cv2.imshow("", img2)
-    # cv2.waitKey(0)
 
     return bounds
 
