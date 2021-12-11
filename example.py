@@ -6,11 +6,11 @@ def main():
 
     pygenshin.StartRecording()
 
-    playerLocation = pygenshin.Location.GetMyLocation()
-    item = pygenshin.MapItems.GetClosestItemOfType(
+    playerLocation = pygenshin.Map.Location.GetMyLocation()
+    item = pygenshin.Map.Items.GetClosestItemOfType(
         playerLocation, "Waypoints:Teleport Waypoint")
     print(item)
-    pygenshin.Navigation.TeleportToItemOnMap(playerLocation, item)
+    pygenshin.Map.Navigation.TeleportToItemOnMap(playerLocation, item)
 
     pygenshin.StopRecording()
 
