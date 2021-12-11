@@ -1,21 +1,22 @@
 import json
-from enum import Enum
-from pygenshin.modules.additional_types import Rect
+import os
+import sys
 
-class Settings:
-    WindowRect = None
-    MapScreenshotRect = None
+DATA_FOLDER: str = None
 
-    DataFolder = None
 
-    def Valid(self) -> bool:
-        return self.WindowRect and self.ScreenshotRect
+def GetDataFolder():
+    return DATA_FOLDER
 
-    def ToJson(self):
-        return json.dumps(self.__dict__)
 
-    def __repr__(self):
-        return "Settings()"
+def main():
+    global DATA_FOLDER
 
-    def __str__(self):
-        return self.ToJson()
+    # Data folder
+    path = "/".join(
+        os.path.dirname(os.path.realpath(__file__)).split("\\")[:-2]
+    )
+    DATA_FOLDER = path + "/data/"
+
+
+main()

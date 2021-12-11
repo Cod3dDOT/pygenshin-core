@@ -1,1 +1,1 @@
-from .pygenshin import PYGenshin
+from .pygenshin import *

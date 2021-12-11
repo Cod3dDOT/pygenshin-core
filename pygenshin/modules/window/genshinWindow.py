@@ -1,38 +1,43 @@
 from pygenshin.modules.additional_types import Rect
-from .windowManager import getWindowHandle, getWindowRect, setForeground
+from . import windowManager as pgWindowManager
+import pygenshin.modules.math as pgMath
 
 
-class GenshinWindow:
-    WINDOW_RECT = None
-    HANDLE = None
+WINDOW_RECT = None
+HANDLE = None
 
-    def __init__(self) -> None:
-        self.HANDLE = getWindowHandle("Genshin Impact")
 
-    def IsGenshinRunning(self) -> bool:
-        handle = getWindowHandle("Genshin Impact")
-        if (not self.HANDLE):
-            return False
+def GetGenshinImpactHandle() -> None:
+    global HANDLE
+    HANDLE = pgWindowManager.GetWindowHandle("Genshin Impact")
+    return HANDLE
 
-        w_r = getWindowRect(self.HANDLE)
-        if (not w_r or not self.IsInBounds(w_r)):
-            return False
-        self.HANDLE = handle
-        self.WINDOW_RECT = w_r
-        return True
 
-    def IsInBounds(self, rect: Rect, bounds: Rect = None) -> bool:
-        if (not bounds):
-            return rect.start.asTuple() > (0, 0)
-        else:
-            return rect.start.asTuple() > (0, 0)  # TODO
+def IsGenshinImpactRunning() -> bool:
+    window = GetGenshinImpactHandle()
+    desktop = pgWindowManager.GetDesktopHandle()
+    if (not window or not desktop):
+        return False
 
-    def UpdateWindowRect(self) -> Rect:
-        self.WINDOW_RECT = getWindowRect(self.HANDLE)
-        return self.WINDOW_RECT
+    windowRect = pgWindowManager.GetWindowRect(window)
+    desktopRect = pgWindowManager.GetWindowRect(desktop)
 
-    def GetWindowRect(self):
-        return self.WINDOW_RECT
+    # or not pgMath.IsRectInsideBounds(windowRect, desktopRect)):
+    if (not windowRect or not desktopRect):
+        return False
 
-    def BringToForeground(self) -> None:
-        setForeground(self.HANDLE)
+    return True
+
+
+def GetGenshinImpactWindowRect() -> Rect:
+    global WINDOW_RECT
+    window = GetGenshinImpactHandle()
+    # if (not window):
+    #     return False
+
+    WINDOW_RECT = pgWindowManager.GetWindowRect(window)
+    return WINDOW_RECT
+
+
+def BringGenshinImpactToFront() -> None:
+    pgWindowManager.SetWindowToForeground(HANDLE)

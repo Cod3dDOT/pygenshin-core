@@ -4,6 +4,7 @@ import threading
 import d3dshot
 from enum import Enum
 import cv2
+import time
 
 from pygenshin.modules.additional_types import PYGenshinException, Rect
 
@@ -28,10 +29,12 @@ class mssDetection:
     mss = None
     thread = None
     lastFrame = None
+    isRecording: bool = False
 
     def CreateMss(self):
         self.mss = mss.mss()
         self.thread = StoppableThread(target=self._takeScreenshots)
+        self.thread.daemon = True
 
     def SetResolution(self, res):
         self.resolution = res
@@ -40,6 +43,7 @@ class mssDetection:
         if (not self.resolution):
             raise PYGenshinException("mssDetection: Resolution is not set")
         self.thread.start()
+        self.isRecording = True
 
     def _takeScreenshots(self):
         while (not self.thread.paused()):
@@ -50,9 +54,14 @@ class mssDetection:
             self.thread.pause()
             self.thread.join()
             self.thread = StoppableThread(target=self._takeScreenshots)
+            self.thread.daemon = True
+            self.isRecording = False
 
     def GetLastFrame(self):
         return self.lastFrame
+
+    def IsRecording(self):
+        return self.isRecording
 
 
 class d3dshotDetection:
@@ -76,55 +85,76 @@ class d3dshotDetection:
     def GetLastFrame(self):
         return cv2.cvtColor(self.d3dshot.get_latest_frame(), cv2.COLOR_BGR2RGB)
 
+    def IsRecording(self):
+        return self.d3dshot.is_capturing()
+
 
 class DETECTION_MODE(Enum):
-    D3DSHOT = 0
-    MSS = 1
+    MSS = "mss"
+    D3DSHOT = "d3dshot"
 
 
-class Detection:
-    Mode = None
+Mode: DETECTION_MODE = None
+Mss: mssDetection = None
+D3DShot: d3dshotDetection = None
 
-    Mss = None
-    D3DShot = None
 
-    def __init__(self, mode: DETECTION_MODE = DETECTION_MODE.D3DSHOT) -> None:
-        if (not isinstance(mode, DETECTION_MODE)):
-            raise PYGenshinException("Incorrect Detection Mode")
-        self.Mode = mode
+def CreateScreenGrabber(mode: DETECTION_MODE = DETECTION_MODE.MSS) -> None:
+    global Mode
+    global Mss
+    global D3DShot
 
-        if (mode == DETECTION_MODE.MSS):
-            self.mss = mssDetection()
-            self.mss.CreateMss()
+    if (not isinstance(mode, DETECTION_MODE)):
+        raise PYGenshinException("Incorrect Detection Mode")
 
-        if (mode == DETECTION_MODE.D3DSHOT):
-            self.D3DShot = d3dshotDetection()
-            self.D3DShot.CreateD3DShot()
+    Mode = mode
 
-    def SetResolution(self, resolution: Rect):
-        if (self.Mode == DETECTION_MODE.MSS):
-            return self.mss.SetResolution(resolution.asMss())
+    if (mode == DETECTION_MODE.MSS):
+        Mss = mssDetection()
+        Mss.CreateMss()
 
-        if (self.Mode == DETECTION_MODE.D3DSHOT):
-            return self.D3DShot.SetResolution(resolution.asTuple())
+    if (mode == DETECTION_MODE.D3DSHOT):
+        D3DShot = d3dshotDetection()
+        D3DShot.CreateD3DShot()
 
-    def StartRecording(self):
-        if (self.Mode == DETECTION_MODE.MSS):
-            return self.mss.StartRecording()
 
-        if (self.Mode == DETECTION_MODE.D3DSHOT):
-            return self.D3DShot.StartRecording()
+def SetResolution(resolution: Rect):
+    if (Mode == DETECTION_MODE.MSS):
+        return Mss.SetResolution(resolution.asMss())
 
-    def StopRecording(self):
-        if (self.Mode == DETECTION_MODE.MSS):
-            return self.mss.StopRecording()
+    if (Mode == DETECTION_MODE.D3DSHOT):
+        return D3DShot.SetResolution(resolution.asTuple())
 
-        if (self.Mode == DETECTION_MODE.D3DSHOT):
-            return self.D3DShot.StopRecording()
 
-    def GetLastFrame(self):
-        if (self.Mode == DETECTION_MODE.MSS):
-            return self.mss.GetLastFrame()
+def StartRecording():
+    if (Mode == DETECTION_MODE.MSS):
+        return Mss.StartRecording()
 
-        if (self.Mode == DETECTION_MODE.D3DSHOT):
-            return self.D3DShot.GetLastFrame()
+    if (Mode == DETECTION_MODE.D3DSHOT):
+        return D3DShot.StartRecording()
+
+    time.sleep(1)
+
+
+def StopRecording():
+    if (Mode == DETECTION_MODE.MSS):
+        return Mss.StopRecording()
+
+    if (Mode == DETECTION_MODE.D3DSHOT):
+        return D3DShot.StopRecording()
+
+
+def IsRecording():
+    if (Mode == DETECTION_MODE.MSS):
+        return Mss.IsRecording()
+
+    if (Mode == DETECTION_MODE.D3DSHOT):
+        return D3DShot.IsRecording()
+
+
+def GetLastFrame():
+    if (Mode == DETECTION_MODE.MSS):
+        return Mss.GetLastFrame()
+
+    if (Mode == DETECTION_MODE.D3DSHOT):
+        return D3DShot.GetLastFrame()

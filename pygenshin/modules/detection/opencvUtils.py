@@ -1,18 +1,12 @@
 import numpy
 import cv2
-import math
 
-from pygenshin.modules.additional_types import PYGenshinException, Rect, Vector2
-
-
-def isInsideBounds(coordinates, bounds) -> bool:
-    return not (coordinates[0] < bounds[0][0] or coordinates[0] > bounds[1][0] or coordinates[1] < bounds[0][1] or coordinates[1] > bounds[1][1])
-
+from pygenshin.modules.additional_types import Rect, Vector2
 
 sift = cv2.SIFT_create()
 
 
-def featureMatching(data, template, threshold=0.7, data_info=()):
+def FeatureMatch(data, template, threshold=0.7, data_info=()):
     MIN_MATCH_COUNT = 10
     # Initiate SIFT detector
 
@@ -57,9 +51,9 @@ def featureMatching(data, template, threshold=0.7, data_info=()):
     dst = cv2.perspectiveTransform(pts, M)
 
     np_o = numpy.int32(dst)
-    bounds = [[np_o[0][0][0], np_o[0][0][1]], [np_o[2][0][0], np_o[2][0][1]]]
+    bounds = [np_o[0][0][0], np_o[0][0][1], np_o[2][0][0], np_o[2][0][1]]
 
-    return bounds
+    return Rect.fromArray(bounds)
 
 
 def non_max_suppression(boxes, overlapThresh):
@@ -109,7 +103,7 @@ def non_max_suppression(boxes, overlapThresh):
     return boxes[pick].astype("int")
 
 
-def allMatches(data, templates, threshold=0.8):
+def FindAllMatches(data, templates, threshold=0.8):
     data_gray = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
     results = []
     for template in templates:
@@ -126,7 +120,7 @@ def allMatches(data, templates, threshold=0.8):
     return results
 
 
-def bestMatches(data, templates, threshold=0.8):
+def FindBestMatches(data, templates, threshold=0.8):
     data_gray = cv2.cvtColor(data, cv2.COLOR_BGR2GRAY)
 
     results = []
@@ -146,18 +140,10 @@ def bestMatches(data, templates, threshold=0.8):
     return results
 
 
-def distanceBetweenPoints(x1, y1, x2, y2) -> float:
-    return math.sqrt((x2-x1)**2 + (y2-y1)**2)
-
-
-def getImageSize(image) -> Vector2:
+def ImageSize(image) -> Vector2:
     return Vector2.fromTuple(image[:-1][::-1])
 
 
-def cropImage(original, bounds: Rect):
-    if (not isinstance(bounds, Rect)):
-        raise PYGenshinException(
-            "bounds must be of type Rect")
-
+def CropImage(image, bounds: Rect):
     dims = bounds.GetDimensions()
-    return original[bounds.start.y:(bounds.start.y + dims.y), bounds.start.x:(bounds.start.x + dims.x)]
+    return image[bounds.start.y:(bounds.start.y + dims.y), bounds.start.x:(bounds.start.x + dims.x)]

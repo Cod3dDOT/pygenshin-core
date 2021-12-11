@@ -1,6 +1,6 @@
 class Vector2:
-    x: float = 0
-    y: float = 0
+    x: float = None
+    y: float = None
 
     def __init__(self, x: float = 0, y: float = 0) -> None:
         self.x = x
@@ -43,7 +43,7 @@ class Vector2:
             return Vector2(int(self.x * float(resolution[0])), int(self.y * float(resolution[1])))
 
     def __repr__(self):
-        return "Vector2()"
+        return f"Vector2({self.x}, {self.y})"
 
     def __str__(self):
         return f"Vector2({self.x}, {self.y})"
@@ -56,11 +56,10 @@ class Vector2:
 
 
 class Rect:
-    start = Vector2()
-    end = Vector2()
-    center = Vector2()
+    start: Vector2 = None
+    end: Vector2 = None
+    center: Vector2 = None
 
-    tuple = ()
     mss = {}
 
     def __init__(self, startLocation: Vector2, endLocation: Vector2) -> None:
@@ -68,7 +67,6 @@ class Rect:
         self.end = endLocation
         self.center = (startLocation + endLocation) / 2
 
-        self.tuple = (self.start.x, self.start.y, self.end.x, self.end.y)
         self.mss = {"left": self.start.x, "top": self.start.y,
                     "width": self.end.x - self.start.x, "height": self.end.y - self.start.y}
 
@@ -81,7 +79,7 @@ class Rect:
         return cls(Vector2(rect[0], rect[1]), Vector2(rect[2], rect[3]))
 
     def GetDimensions(self) -> Vector2:
-        return Vector2(abs(self.tuple[2] - self.tuple[0]), abs(self.tuple[3] - self.tuple[1]))
+        return Vector2(abs(self.asTuple()[2] - self.asTuple()[0]), abs(self.asTuple()[3] - self.asTuple()[1]))
 
     def toPixels(self, resolution: Vector2):
         if isinstance(resolution, Vector2):
@@ -102,7 +100,10 @@ class Rect:
         return self.mss
 
     def asTuple(self):
-        return self.tuple
+        return (self.start.x, self.start.y, self.end.x, self.end.y)
+
+    def asArray(self):
+        return [self.start.x, self.start.y, self.end.x, self.end.y]
 
 
 class PYGenshinException(Exception):

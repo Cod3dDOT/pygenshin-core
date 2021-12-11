@@ -1,2 +1,2 @@
-from .inputs import Inputs
-from . import keybindings
+from .inputs import *
+from .keybindings import *

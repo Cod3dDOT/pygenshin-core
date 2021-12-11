@@ -1,137 +1,139 @@
 import pygenshin.modules.inputs as pgInputs
-import pygenshin.modules.detection.opencvUtils as opencvUtils
-from pygenshin.modules.additional_types import PYGenshinException, Rect, Vector2
 import pygenshin.modules.gamescreens as pgScreens
+import pygenshin.modules.detection.opencvUtils as opencvUtils
+import pygenshin.modules.math as pgMath
+import pygenshin.modules.settings as pgSettings
+import pygenshin.modules.window as pgWindow
+from pygenshin.modules.additional_types import PYGenshinException, Rect, Vector2
 
 import cv2
 import time
 import os
 import numpy
 
+DOMAIN_MARKER_IMAGE = None
+TELEPORT_MARKER_IMAGE = None
+FULL_MAP_IMAGE = None
 
-class MapLocation:
-    Inputs: pgInputs.Inputs = None
+FULL_MAP_INFO = None
 
-    DomainMarker = None
-    TeleportMarker = None
-    FullMap = None
+CAN_USE_MINIMAP = False
+RESIZED_MAP = None
+RESIZED_MAP_POSITION: Rect = None
 
-    FullMapLoadedDescriptors = False
-    FullMapInfo = None
+CurrentPosition: Vector2 = None
 
-    WindowRect: Rect = None
 
-    ResizedMapIsSet = False
-    ResizedMap = None
-    ResizedMapPosition: Rect = None
+def ZoomIn():
+    pgInputs.SetMousePosRelative(pgScreens.MapScreen.Buttons.ZoomPlus.position.center.toPixels(
+        pgWindow.GetGenshinImpactWindowRect().GetDimensions().asTuple()))
+    for _ in range(5):
+        pgInputs.ClickMouse()
+        time.sleep(0.1)
 
-    CurrentPosition: Vector2 = None
 
-    def __init__(self, datafolder, windowrect: Rect, inputs: pgInputs.Inputs, loadMapDescriptors=True) -> None:
-        self.DomainMarker = cv2.imread(
-            datafolder + "images/map/location/domainMarker.png", cv2.IMREAD_GRAYSCALE)
-        self.TeleportMarker = cv2.imread(
-            datafolder + "images/map/location/teleportMarker.png", cv2.IMREAD_GRAYSCALE)
-        self.FullMap = cv2.imread(
-            datafolder + "images/map/full_cropped.jpg", cv2.IMREAD_GRAYSCALE)
+def LoadMapDescriptors(kpts_path, desc_path):
+    global FULL_MAP_INFO
 
-        self.WindowRect = windowrect
-        self.Inputs = inputs
+    if os.path.getsize(kpts_path) <= 0 or os.path.getsize(desc_path) <= 0:
+        raise PYGenshinException("Failed loading descriptors")
 
-        if (loadMapDescriptors):
-            self.LoadMapDescriptors(
-                datafolder + "computed/map_computed_kpts.npy",
-                datafolder + "computed/map_computed_desc.npy"
-            )
+    kpts = numpy.load(kpts_path)
+    desc = numpy.load(desc_path)
+    if kpts.size == 0 or desc.size == 0:
+        raise PYGenshinException("Failed loading descriptors")
 
-    def ZoomIn(self):
-        self.Inputs.SetMousePos(pgScreens.MapScreen.Buttons.ZoomPlus.position.center.toPixels(
-            self.WindowRect.GetDimensions().asTuple()))
-        for _ in range(5):
-            self.Inputs.ClickMouse()
-            time.sleep(0.1)
+    try:
+        keypoints = [cv2.KeyPoint(x, y, _size, _angle, _response, int(_octave), int(_class_id))
+                     for x, y, _size, _angle, _response, _octave, _class_id in list(kpts)]
+        FULL_MAP_INFO = (keypoints, numpy.array(desc))
+    except(IndexError):
+        raise PYGenshinException("Failed loading descriptors")
 
-    def LoadMapDescriptors(self, kpts_path, desc_path):
-        if os.path.getsize(kpts_path) <= 0 or os.path.getsize(desc_path) <= 0:
-            raise PYGenshinException("Failed loading descriptors")
-        kpts = numpy.load(kpts_path)
-        desc = numpy.load(desc_path)
-        if kpts.size == 0 or desc.size == 0:
-            raise PYGenshinException("Failed loading descriptors")
-        try:
-            keypoints = [cv2.KeyPoint(x, y, _size, _angle, _response, int(_octave), int(_class_id))
-                         for x, y, _size, _angle, _response, _octave, _class_id in list(kpts)]
-            self.FullMapInfo = (keypoints, numpy.array(desc))
-            self.FullMapLoadedDescriptors = True
-        except(IndexError):
-            raise PYGenshinException("Failed loading descriptors")
 
-    def GetMyLocationOnFullMap(self, screenshot) -> Vector2:
-        self.ZoomIn()
-        rect = None
-        if (self.FullMapLoadedDescriptors):
-            rect = opencvUtils.featureMatching(
-                self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY), 0.7, self.FullMapInfo)
-        else:
-            rect = opencvUtils.featureMatching(
-                self.FullMap, cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY))
-        rect = Rect.fromTuples(rect[0], rect[1])
+def GetMyLocationOnFullMap(screenshot) -> Vector2:
+    global CAN_USE_MINIMAP
+    global RESIZED_MAP_POSITION
+    global RESIZED_MAP
 
-        self.ResizedMapIsSet = True
-        self.ResizedMapPosition = round(rect)
-        self.ResizedMap = opencvUtils.cropImage(self.FullMap, rect)
-        self.CurrentPosition = round(rect.center)
-        return self.CurrentPosition
+    ZoomIn()
 
-        # domain, teleport = opencvUtils.bestMatches(
-        #     screenshot, [self.DomainMarker, self.TeleportMarker])
+    screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY)
+    rect = None
+    rect = opencvUtils.FeatureMatch(
+        FULL_MAP_IMAGE, screenshot, 0.7, FULL_MAP_INFO
+    )
 
-        # if (domain):
-        #     inputs.SetMousePos(Vector2.fromTuple(domain))
-        # if (teleport):
-        #     inputs.SetMousePos(Vector2.fromTuple(teleport))
+    CAN_USE_MINIMAP = True
+    RESIZED_MAP_POSITION = round(rect)
+    RESIZED_MAP = opencvUtils.CropImage(FULL_MAP_IMAGE, rect)
+    # self.CurrentPosition = round(rect.center)
+    return round(rect.center)
 
-    def CanScreenMinimap(self):
-        return self.ResizedMapIsSet
 
-    def GetMyLocationOnMinimap(self, minimap):
-        if (not self.CanScreenMinimap()):
-            return
+def CanScreenMinimap():
+    return CAN_USE_MINIMAP
 
-        minimap = opencvUtils.cropImage(
-            minimap,
-            pgScreens.GameScreen.Buttons.MiniMap.position.toPixels(
-                self.WindowRect.GetDimensions()
-            )
+
+def GetMyLocationOnMinimap(screenshot):
+    global RESIZED_MAP
+    global RESIZED_MAP_POSITION
+
+    if (not CanScreenMinimap()):
+        return
+
+    minimap = opencvUtils.CropImage(
+        screenshot,
+        pgScreens.GameScreen.Buttons.MiniMap.position.toPixels(
+            pgWindow.GetGenshinImpactWindowRect().GetDimensions()
         )
+    )
 
-        minimap_h = minimap.shape[0]
+    minimap_h = opencvUtils.ImageSize(minimap).y
 
-        rect = opencvUtils.featureMatching(
-            self.ResizedMap, cv2.cvtColor(minimap, cv2.COLOR_RGB2GRAY))
-        rect = round(Rect.fromTuples(rect[0], rect[1]))
-        self.CurrentPosition = self.ResizedMapPosition.start + rect.center
+    rect = opencvUtils.FeatureMatch(
+        RESIZED_MAP, cv2.cvtColor(minimap, cv2.COLOR_RGB2GRAY)
+    )
+    CurrentPosition = RESIZED_MAP_POSITION.start + rect.center
 
-        distanceToBounds = self.DistanceToBounds(self.CurrentPosition, rect)
-        # its a square so we can check only height
-        if (distanceToBounds < minimap_h*2):
-            dims = self.WindowRect.GetDimensions()
-            resize_rect = Rect(
-                Vector2(self.CurrentPosition.x - dims.x / 2,
-                        self.CurrentPosition.y - dims.y / 2),
-                Vector2(self.CurrentPosition.x + dims.x / 2,
-                        self.CurrentPosition.y + dims.y / 2))
-            self.ResizedMap = opencvUtils.cropImage(self.FullMap, resize_rect)
-            print("Cropping")
+    distanceToBounds = pgMath.MinPointDistanceToBounds(
+        CurrentPosition, rect
+    )
+    # its a square so we can check only height
+    if (distanceToBounds < minimap_h*2):
+        dims = pgWindow.GetGenshinImpactWindowRect().GetDimensions()
+        resize_rect = Rect(
+            Vector2(CurrentPosition.x - dims.x / 2,
+                    CurrentPosition.y - dims.y / 2),
+            Vector2(CurrentPosition.x + dims.x / 2,
+                    CurrentPosition.y + dims.y / 2)
+        )
+        RESIZED_MAP = opencvUtils.CropImage(FULL_MAP_IMAGE, resize_rect)
+        RESIZED_MAP_POSITION = resize_rect
+        print("Cropping")
 
-        return self.CurrentPosition
+    return CurrentPosition
 
-    def ConvertScreenLocationToMap(self, location: Vector2):
-        return location / Vector2(self.X_SCALE, self.Y_SCALE)
 
-    def DistanceToBounds(self, point: Vector2, bounds: Rect):
-        distTop = abs(point.y - bounds.start.y)
-        distBottom = abs(point.y - bounds.end.y)
-        distLeft = abs(point.x - bounds.start.x)
-        distRight = abs(point.y - bounds.end.x)
-        return min([distTop, distBottom, distLeft, distRight])
+def main():
+    global DOMAIN_MARKER_IMAGE
+    global TELEPORT_MARKER_IMAGE
+    global FULL_MAP_IMAGE
+
+    DOMAIN_MARKER_IMAGE = cv2.imread(
+        pgSettings.GetDataFolder() + "images/map/location/domainMarker.png", cv2.IMREAD_GRAYSCALE
+    )
+    TELEPORT_MARKER_IMAGE = cv2.imread(
+        pgSettings.GetDataFolder() + "images/map/location/teleportMarker.png", cv2.IMREAD_GRAYSCALE
+    )
+    FULL_MAP_IMAGE = cv2.imread(
+        pgSettings.GetDataFolder() + "images/map/full_cropped.jpg", cv2.IMREAD_GRAYSCALE
+    )
+
+    LoadMapDescriptors(
+        pgSettings.GetDataFolder() + "computed/map_computed_kpts.npy",
+        pgSettings.GetDataFolder() + "computed/map_computed_desc.npy"
+    )
+
+
+main()

@@ -1,1 +1,1 @@
-from .genshinWindow import GenshinWindow
+from .genshinWindow import *

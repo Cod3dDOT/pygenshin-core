@@ -1,1 +1,1 @@
-from .detection import Detection, DETECTION_MODE
+from .detection import *

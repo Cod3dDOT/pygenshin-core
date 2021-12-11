@@ -2,11 +2,11 @@ import win32gui
 from pygenshin.modules.additional_types import Rect
 
 
-def getWindowHandle(title: str):
+def GetWindowHandle(title: str):
     return win32gui.FindWindow(None, title)
 
 
-def getWindowRect(handle) -> Rect:
+def GetWindowRect(handle) -> Rect:
     xS, yS, xE, yE = win32gui.GetWindowRect(handle)
     #x, y = win32gui.ClientToScreen(handle, (xS, yS))
     #x1, y1 = win32gui.ClientToScreen(handle, (xE, yE))
@@ -14,5 +14,9 @@ def getWindowRect(handle) -> Rect:
     return rect
 
 
-def setForeground(handle) -> None:
+def SetWindowToForeground(handle) -> None:
     win32gui.SetForegroundWindow(handle)
+
+
+def GetDesktopHandle():
+    return win32gui.GetDesktopWindow()
